@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import "./CssFiles/Signup.css";
 import apibackend from "../apibackend";
-
-
 apibackend();
 export function Sigh() {
-
+ 
   const [name, setname] = useState("");
   const [email, setemail] = useState("");
   const [password, setpassword] = useState("");

@@ -1,0 +1,347 @@
+/* Home.css - Sirf Layout ke liye, koi form styling nahi */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.home-dark {
+  min-height: 100vh;
+  background: #0a0c10;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dark Background */
+.dark-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 30%, #141824, #050608);
+  z-index: 0;
+}
+
+/* Navbar */
+.dark-navbar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 3rem;
+  background: rgba(10, 12, 16, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.logo-icon {
+  font-size: 1.6rem;
+  color: #6366f1;
+}
+
+.logo-text {
+  color: white;
+}
+
+.logo-ai {
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.beta-tag {
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  color: #a5b4fc;
+}
+
+.nav-right {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: all 0.2s;
+}
+
+.nav-link:hover {
+  color: white;
+}
+
+.nav-link.active {
+  color: #818cf8;
+  border-bottom: 2px solid #818cf8;
+}
+
+/* Main Layout - Two Columns */
+.dark-main {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+  max-width: 1300px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Left Side - Text Content */
+.hero-simple {
+  flex: 1;
+}
+
+.hero-badge-simple {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 40px;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  color: #a5b4fc;
+  margin-bottom: 1.5rem;
+}
+
+.hero-title-simple {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.highlight {
+  background: linear-gradient(135deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: block;
+}
+
+.hero-desc-simple {
+  color: #9ca3af;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.feature-list-simple {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-bottom: 1.5rem;
+}
+
+.feature-simple {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #d1d5db;
+  font-size: 0.9rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #6366f1;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  color: white;
+}
+
+.stats-simple {
+  display: flex;
+  gap: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stats-simple h4 {
+  color: white;
+  font-size: 1.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.stats-simple p {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+/* Right Side - Sirf Container, koi form styling nahi */
+.auth-section-simple {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Sirf wrapper container - form ki styling Auth.page se aayegi */
+.auth-card-simple {
+  width: 100%;
+  max-width: 450px;
+}
+
+/* Sirf container for forms */
+.auth-forms-simple {
+  width: 100%;
+}
+
+/* Yeh sirf header text ke liye hai, form elements ki styling nahi */
+.auth-header-simple {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.auth-icon-simple {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.auth-header-simple h2 {
+  color: white;
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.auth-header-simple p {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+/* Tabs styling - sirf layout ke liye */
+.auth-tabs-simple {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.35rem;
+  border-radius: 60px;
+}
+
+.tab-simple {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.7rem;
+  border-radius: 40px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: all 0.2s;
+}
+
+.tab-simple.active {
+  background: #6366f1;
+  color: white;
+}
+
+/* Footer styling */
+.auth-footer-simple {
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.switch-btn-simple {
+  background: none;
+  border: none;
+  color: #818cf8;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: 0.25rem;
+}
+
+.switch-btn-simple:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+  .dark-main {
+    flex-direction: column;
+    padding: 2rem 1.5rem;
+    gap: 2rem;
+  }
+  
+  .hero-simple {
+    text-align: center;
+    max-width: 100%;
+  }
+  
+  .hero-desc-simple {
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .feature-list-simple {
+    align-items: center;
+  }
+  
+  .stats-simple {
+    justify-content: center;
+  }
+  
+  .dark-navbar {
+    padding: 1rem 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-title-simple {
+    font-size: 2rem;
+  }
+  
+  .dark-navbar {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .nav-right {
+    gap: 1rem;
+  }
+  
+  .dark-main {
+    padding: 1.5rem;
+  }
+}

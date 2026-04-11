@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(cookieparser());
 
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: "https://vega-persional-ai-rht2-li16t2rc1.vercel.app",
     credentials: true
 }));
 

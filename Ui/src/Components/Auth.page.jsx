@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import "./CssFiles/Signup.css";
+import apibackend from "../apibackend";
 
 
+apibackend();
 export function Sigh() {
+
   const [name, setname] = useState("");
   const [email, setemail] = useState("");
   const [password, setpassword] = useState("");
@@ -13,7 +16,7 @@ export function Sigh() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/api/signup", {
+      const res = await fetch(`${apibackend}/api/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -102,7 +105,7 @@ export function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res2 = await fetch("http://localhost:4000/api/login", {
+      const res2 = await fetch(`${apibackend}/api/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

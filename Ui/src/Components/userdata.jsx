@@ -1,7 +1,8 @@
 // useUser.js
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import apibackend from "../apibackend";
+apibackend();
  const useUser = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ import { useNavigate } from "react-router-dom";
   useEffect(() => {
     const getUser = async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/getuser", {
+        const res = await fetch(`${apibackend}/api/getuser`, {
           method: "GET",
           credentials: "include",
         });

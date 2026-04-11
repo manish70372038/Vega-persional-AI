@@ -12,9 +12,12 @@ const app = express();
 app.use(express.json());
 app.use(cookieparser());
 app.use(cors({
-    origin: 
-        "https://vega-persional-ai.netlify.app"
-    ,
+    origin: [
+       "https://vega-persional-ai-pk2n.vercel.app/",
+        "https://vega-persional-ai.netlify.app",
+        
+        
+    ],
     credentials: true
 }));
 app.use("/api", router);

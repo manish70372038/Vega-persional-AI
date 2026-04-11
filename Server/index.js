@@ -11,12 +11,13 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieparser());
-
 app.use(cors({
-    origin: "https://vega-persional-ai.onrender.com",
+    origin: [
+        "https://vega-persional-ai-w45v.vercel.app",
+        "https://vega-persional-ai-w45v-h8gys1p4l.vercel.app"
+    ],
     credentials: true
 }));
-
 app.use("/api", router);
 
 const port = process.env.PORT || 5000;

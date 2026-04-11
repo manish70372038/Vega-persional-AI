@@ -13,6 +13,7 @@ app.use(express.json());
 app.use(cookieparser());
 app.use(cors({
     origin: [
+        "https://vega-persional-ai-mp5f.vercel.app",
        "https://vega-persional-ai-pk2n.vercel.app",
         "https://vega-persional-ai.netlify.app",
         "https://vega-persional-ai-u6wq.vercel.app"

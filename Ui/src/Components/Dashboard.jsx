@@ -5,7 +5,6 @@ import "./CssFiles/Mainpage.css";
 import useUser from "./userdata";
 import askAI from "./gemini";
 import apibackend from "../apibackend";
-apibackend()
 const imagelisting = "/src/assets/ai-input.gif";
 const imagereply = "/src/assets/ai-output.gif";
 

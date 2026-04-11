@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apibackend from "../apibackend";
-apibackend();
+
  const useUser = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();

@@ -1,7 +1,5 @@
 import apibackend from "../apibackend";
 
-apibackend();
-
 const askAI = async (prompt) => {
   const selectedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
  console.log("selectedAI localStorage:", selectedAI); 

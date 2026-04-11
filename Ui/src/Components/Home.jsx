@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Sigh, Login } from "./Auth.page";
 import { useNavigate } from "react-router-dom";
 import "./CssFiles/Home.css";
-
 function Home() {
   const navigate = useNavigate();
   const [page, setPage] = useState("signup");

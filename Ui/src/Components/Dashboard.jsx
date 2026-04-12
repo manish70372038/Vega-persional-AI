@@ -5,8 +5,8 @@ import "./CssFiles/Mainpage.css";
 import useUser from "./userdata";
 import askAI from "./gemini";
 import apibackend from "../apibackend";
-const imagelisting = "/src/assets/ai-input.gif";
-const imagereply = "/src/assets/ai-output.gif";
+import imagelisting from "../assets/ai-input.gif";
+import imagereply from "../assets/ai-output.gif";
 
 function Mainpage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);

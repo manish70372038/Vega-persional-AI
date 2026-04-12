@@ -10,6 +10,7 @@ It can understand voice commands, generate intelligent responses using Gemini AP
 ![Home Screenshot](./projectimages/daboard.png)
 ![Home Screenshot](./projectimages/fulldasboard.png)
 
+
 ---
 
 ## 🚀 Features

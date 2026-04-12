@@ -15,6 +15,6 @@ router.post("/login", Login);
 router.post("/logout", Logout);
 router.get("/profile", Isauthenticated, Profile);
 router.get("/getuser", Isauthenticated, Userdata);
- router.post("/chat" ,Isauthenticated ,gemnicontroller);
+router.post("/chat" ,Isauthenticated ,gemnicontroller);
 
 export default router;

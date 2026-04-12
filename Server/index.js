@@ -11,16 +11,23 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieparser());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://vega-persional-ai-u6wq.vercel.app"
+];
 app.use(cors({
-    origin: [
-        "https://vega-persional-ai-mp5f.vercel.app",
-       "https://vega-persional-ai-pk2n.vercel.app",
-        "https://vega-persional-ai.netlify.app",
-        "https://vega-persional-ai-u6wq.vercel.app"
-         
-    ],
-    credentials: true
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
 }));
+
 app.use("/api", router);
 
 const port = process.env.PORT || 5000;

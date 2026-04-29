@@ -1,11 +1,15 @@
+
+import dns from "dns";
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 import express from "express";
 import Connectdb from "./database/db.js";
-import dotenv from "dotenv";
+import  dotenv from "dotenv";
+dotenv.config();
 import cors from "cors";
 import cookieparser from "cookie-parser";
 import router from "./router/api.js";
 
-dotenv.config();
+
 
 const app = express();
 

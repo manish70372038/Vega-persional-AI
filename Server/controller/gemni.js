@@ -10,28 +10,33 @@ const gemnicontroller = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-   
     const userName = user.name;
     console.log("UserName:", userName);
+    console.log("Command:", command);
+    console.log("AiName:", aiName);
 
-    const result = await Gemniapi(command, userName, aiName);
-    console.log("Gemini Raw:", result);
+    const parsed = await Gemniapi(command, userName, aiName);
+    console.log("Gemini Parsed:", parsed);
 
-    const jsonMatch = result.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return res.status(400).json({ message: "AI ne valid JSON nahi diya" });
+    // Agar string aa gaya toh parse karo
+    let finalParsed = parsed;
+    if (typeof parsed === "string") {
+      try {
+        const jsonMatch = parsed.match(/\{[\s\S]*\}/);
+        finalParsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+      } catch (e) {
+        return res.status(400).json({ message: "JSON parse error", raw: parsed });
+      }
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      return res.status(400).json({ message: "JSON parse error", raw: result });
+    if (!finalParsed) {
+      return res.status(400).json({ message: "AI ne valid response nahi diya" });
     }
 
-    const action = parsed.action;
-    const data = parsed.data;
-    const reply = parsed.reply;
+    const action = finalParsed.action;
+    const data = finalParsed.data || {};
+    const reply = finalParsed.reply;
+    const lang = finalParsed.lang || "en-US";
 
     switch (action) {
       case "youtube_play":
@@ -40,43 +45,48 @@ const gemnicontroller = async (req, res) => {
       case "get_weather":
       case "get_news":
       case "navigate":
-        return res.status(200).json({ action, reply, url: data.url, data });
+        return res.status(200).json({ action, reply, lang, url: data.url, data });
 
       case "open_app":
-        return res.status(200).json({ action, reply, deeplink: data.deeplink, url: data.url, data });
+        return res.status(200).json({ action, reply, lang, deeplink: data.deeplink, url: data.url, data });
 
       case "get_time":
-        return res.status(200).json({ action, reply, time: data.time, data });
+        return res.status(200).json({ action, reply, lang, time: data.time, data });
 
       case "get_date":
-        return res.status(200).json({ action, reply, date: data.date, data });
+        return res.status(200).json({ action, reply, lang, date: data.date, data });
 
       case "get_day":
-        return res.status(200).json({ action, reply, day: data.day, data });
+        return res.status(200).json({ action, reply, lang, day: data.day, data });
 
       case "get_datetime":
-        return res.status(200).json({ action, reply, time: data.time, date: data.date, day: data.day, data });
+        return res.status(200).json({ action, reply, lang, time: data.time, date: data.date, day: data.day, data });
 
       case "set_reminder":
-        return res.status(200).json({ action, reply, reminder_task: data.reminder_task, reminder_time: data.reminder_time, data });
+        return res.status(200).json({ action, reply, lang, reminder_task: data.reminder_task, reminder_time: data.reminder_time, data });
 
       case "calculate":
-        return res.status(200).json({ action, reply, expression: data.expression, result: data.result, data });
+        return res.status(200).json({ action, reply, lang, expression: data.expression, result: data.result, data });
+
+      case "interview_start":
+      case "interview_answer":
+      case "interview_end":
+        return res.status(200).json({ action, reply, lang, interview_question: data.interview_question, interview_feedback: data.interview_feedback, data });
 
       case "tell_joke":
       case "general":
-        return res.status(200).json({ action, reply, data });
+        return res.status(200).json({ action, reply, lang, data });
 
       case "none":
-        return res.status(200).json({ action: "none", reply: "", data: {} });
+        return res.status(200).json({ action: "none", reply: "", lang, data: {} });
 
       default:
-        return res.status(200).json({ action: "general", reply, data });
+        return res.status(200).json({ action: "general", reply, lang, data });
     }
 
   } catch (error) {
-    console.error("Controller Error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("Controller Error:", error.message);
+    res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
 

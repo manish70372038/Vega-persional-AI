@@ -88,7 +88,7 @@ User says: "${command}"`
         "Authorization": `Bearer ${process.env.Grok_api}` // ← apiKey use karo
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
         max_tokens: 250,
         temperature: 0.3,
         messages: [{ role: "user", content: prompt }],
@@ -129,7 +129,7 @@ User says: "${command}"`
       // Rate limit check karo
       if (result.error?.code === "rate_limit_exceeded") {
         return {
-          reply: "Thoda ruko, bahut requests aa rahi hain!",
+          reply: "Your request limit expire try later ",
           action: "general",
           lang: "hi-IN",
           data: {}

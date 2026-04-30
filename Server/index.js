@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(cookieparser());
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://vega-persional-ai-u6wq.vercel.app"
+  "https://vega-persional-ai.vercel.app/"
 ];
 app.use(cors({
   origin: function (origin, callback) {

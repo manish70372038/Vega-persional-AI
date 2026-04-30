@@ -1,8 +1,8 @@
 import apibackend from "../apibackend";
-
 const askAI = async (prompt) => {
   const selectedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
- console.log("selectedAI localStorage:", selectedAI); 
+  console.log("selectedAI localStorage:", selectedAI);
+
   try {
     const response = await fetch(`${apibackend}/api/chat`, {
       method: "POST",
@@ -11,15 +11,15 @@ const askAI = async (prompt) => {
       },
       credentials: "include",
       body: JSON.stringify({
-        command: prompt,        // ✅ command bhejo messages nahi
+        command: prompt,
         aiName: selectedAI.name,
       }),
     });
 
     const data = await response.json();
     console.log("AI Response:", data);
-    return data; // ✅ BAS YAHI FIX HAI — return karo
-    
+    return data;
+
   } catch (error) {
     console.log("Error:", error);
     return null;

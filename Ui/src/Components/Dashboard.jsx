@@ -1,12 +1,23 @@
-// Mainpage.jsx - Dark Theme No Scroll Design
+
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CssFiles/Mainpage.css";
 import useUser from "./userdata";
 import askAI from "./gemini";
-import apibackend from "../apibackend";
 import imagelisting from "../assets/ai-input.gif";
 import imagereply from "../assets/ai-output.gif";
+import apibackend from "../apibackend";
+
+
+const isHindi = (text) => {
+  const hindiPattern = /[\u0900-\u097F]/;
+  const hindiWords = ["kya", "hai", "nahi", "haan", "bolo", "karo", "batao",
+    "mujhe", "tumhe", "aaj", "kal", "abhi", "kitna", "kaun", "kaise",
+    "gaana", "chala", "kholo", "baja", "time", "date", "din", "mausam",
+    "dhundh", "laga", "bajao", "sun", "dekho", "bhai", "yaar", "bol"];
+  const lower = text.toLowerCase();
+  return hindiPattern.test(text) || hindiWords.some(w => lower.includes(w));
+};
 
 function Mainpage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -16,10 +27,19 @@ function Mainpage() {
   const [tempSelectedUrl, setTempSelectedUrl] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [voiceLang, setVoiceLang] = useState("en-US");
   const recognitionRef = useRef(null);
   const shouldRunRef = useRef(false);
 
   const user = useUser();
+
+  // Voices preload karo — fast speech ke liye
+  useEffect(() => {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }, []);
 
   useEffect(() => {
     const savedAI = localStorage.getItem("selectedAI");
@@ -57,17 +77,39 @@ function Mainpage() {
     localStorage.setItem("selectedAI", JSON.stringify(data));
   };
 
-  const speak = (text) => {
+  const speak = (text, lang = "en-US") => {
     if (!text) return;
     window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = 1;
+    utterance.lang = lang;
+    utterance.rate = 1.15;  // fast speech
     utterance.pitch = 1;
+
+    // Best voice dhundho us language ke liye
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
+    if (preferred) utterance.voice = preferred;
+
     utterance.onstart = () => setIsAiSpeaking(true);
     utterance.onend = () => setIsAiSpeaking(false);
     window.speechSynthesis.speak(utterance);
   };
+
+  // Lang change hone pe recognition restart karo
+  useEffect(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    recognition.lang = voiceLang;
+    if (isListening) {
+      shouldRunRef.current = false;
+      recognition.stop();
+      setTimeout(() => {
+        shouldRunRef.current = true;
+        try { recognition.start(); } catch (e) {}
+      }, 400);
+    }
+  }, [voiceLang]);
 
   useEffect(() => {
     try {
@@ -82,7 +124,7 @@ function Mainpage() {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = false;
-      recognition.lang = "en-US";
+      recognition.lang = voiceLang;
       recognitionRef.current = recognition;
 
       recognition.onresult = async (event) => {
@@ -90,37 +132,43 @@ function Mainpage() {
           event.results[event.results.length - 1][0].transcript.trim();
         console.log("User bola:", transcript);
 
-        const savedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
-        const aiName = savedAI?.name || "";
+        // Auto detect karo — Hindi hai ya English
+        const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
+        console.log("Detected lang:", detectedLang);
 
-        if (aiName && transcript.toLowerCase().includes(aiName.toLowerCase())) {
-          console.log("✅ AI name mila — calling AI...");
-          const response = await askAI(transcript);
-          console.log("response", response);
+        const response = await askAI(transcript);
+        console.log("AI Response:", response);
 
-          if (response?.reply) speak(response.reply);
-          if (response?.url) window.open(response.url, "_blank");
-          if (response?.deeplink) {
-            window.location.href = response.deeplink;
-            setTimeout(() => {
-              if (response?.url) window.open(response.url, "_blank");
-            }, 2000);
-          }
-        } else {
-          console.log("❌ AI name nahi mila — chup raho");
+        if (response?.reply) {
+          // reply ki lang se speak karo
+          const replyLang = response?.lang || detectedLang;
+          speak(response.reply, replyLang);
+        }
+
+        if (response?.url) window.open(response.url, "_blank");
+
+        if (response?.deeplink) {
+          window.location.href = response.deeplink;
+          setTimeout(() => {
+            if (response?.url) window.open(response.url, "_blank");
+          }, 2000);
         }
       };
 
       recognition.onerror = (event) => {
         console.log("Speech error:", event.error);
+        // Network error pe restart karo
+        if (event.error === "network" && shouldRunRef.current) {
+          setTimeout(() => {
+            try { recognition.start(); } catch (e) {}
+          }, 1000);
+        }
       };
 
       recognition.onend = () => {
         if (shouldRunRef.current) {
           setTimeout(() => {
-            try {
-              recognition.start();
-            } catch (e) {}
+            try { recognition.start(); } catch (e) {}
           }, 300);
         }
       };
@@ -140,12 +188,17 @@ function Mainpage() {
     } else {
       shouldRunRef.current = true;
       try {
+        recognition.lang = voiceLang;
         recognition.start();
         setIsListening(true);
       } catch (e) {
         console.log("Start error:", e);
       }
     }
+  };
+
+  const toggleLang = () => {
+    setVoiceLang(prev => prev === "en-US" ? "hi-IN" : "en-US");
   };
 
   if (!user)
@@ -187,7 +240,7 @@ function Mainpage() {
       </nav>
 
       <div className="main-layout">
-        {/* Side Panel - AI Configuration */}
+        {/* Side Panel */}
         <aside className="config-panel">
           <div className="panel-header">
             <h3>AI Assistant</h3>
@@ -209,25 +262,25 @@ function Mainpage() {
             <div className="form-group">
               <label>Select Avatar</label>
               <div className="avatar-grid">
-                <div 
+                <div
                   className={`avatar-card ${tempSelectedUrl === "https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" ? "selected" : ""}`}
                   onClick={() => handleImageClick("https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg")}
                 >
                   <img src="https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" alt="Avatar 1" />
                 </div>
-                <div 
+                <div
                   className={`avatar-card ${tempSelectedUrl === "https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" ? "selected" : ""}`}
                   onClick={() => handleImageClick("https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg")}
                 >
                   <img src="https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" alt="Avatar 2" />
                 </div>
-                <div 
+                <div
                   className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" ? "selected" : ""}`}
                   onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg")}
                 >
                   <img src="https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" alt="Avatar 3" />
                 </div>
-                <div 
+                <div
                   className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg" ? "selected" : ""}`}
                   onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg")}
                 >
@@ -242,57 +295,62 @@ function Mainpage() {
           </div>
         </aside>
 
-        {/* Main Content Area */}
+        {/* Main Content */}
         <main className="content-area">
           {selectedAi ? (
             <>
-              {/* Voice Control Bar */}
               <div className="voice-control">
                 <div className="welcome-text">
                   <h2>Hello, {user.name}</h2>
                   <p>Your assistant is ready</p>
                 </div>
-                <button 
-                  onClick={toggleListening}
-                  className={`voice-btn ${isListening ? 'active' : ''}`}
-                >
-                  <span>{isListening ? '🔴' : '🎤'}</span>
-                  <span>{isListening ? 'Listening...' : 'Start Voice'}</span>
-                </button>
+
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {/* Language Toggle */}
+                  <button onClick={toggleLang} className="voice-btn"
+                    style={{ background: voiceLang === "hi-IN" ? "#f97316" : "#6366f1" }}>
+                    <span>{voiceLang === "hi-IN" ? "🇮🇳" : "🇺🇸"}</span>
+                    <span>{voiceLang === "hi-IN" ? "Hindi" : "English"}</span>
+                  </button>
+
+                  {/* Voice Button */}
+                  <button
+                    onClick={toggleListening}
+                    className={`voice-btn ${isListening ? "active" : ""}`}
+                  >
+                    <span>{isListening ? "🔴" : "🎤"}</span>
+                    <span>{isListening ? "Listening..." : "Start Voice"}</span>
+                  </button>
+                </div>
               </div>
 
-              {/* AI Display */}
               <div className="ai-showcase">
-                <div className={`ai-avatar ${isAiSpeaking ? 'speaking' : isListening ? 'listening' : ''}`}>
-                  <img 
-                    src={selectedAi.url} 
-                    alt={selectedAi.name}
-                  />
+                <div className={`ai-avatar ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
+                  <img src={selectedAi.url} alt={selectedAi.name} />
                   {(isAiSpeaking || isListening) && (
                     <div className="status-indicator">
-                      {isAiSpeaking ? '🔊 Speaking...' : '🎧 Listening...'}
+                      {isAiSpeaking ? "🔊 Speaking..." : "🎧 Listening..."}
                     </div>
                   )}
                 </div>
                 <div className="ai-details">
                   <h3>{selectedAi.name}</h3>
                   <div className="status-badge">
-                    <span className={`status-icon ${isAiSpeaking ? 'speaking' : isListening ? 'listening' : 'idle'}`}></span>
-                    <span>{isAiSpeaking ? 'Speaking' : isListening ? 'Listening' : 'Idle'}</span>
+                    <span className={`status-icon ${isAiSpeaking ? "speaking" : isListening ? "listening" : "idle"}`}></span>
+                    <span>{isAiSpeaking ? "Speaking" : isListening ? "Listening" : "Idle"}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Animation Section */}
               <div className="animation-section">
-                <div className={`animation-item ${isListening && !isAiSpeaking ? 'active' : ''}`}>
+                <div className={`animation-item ${isListening && !isAiSpeaking ? "active" : ""}`}>
                   <div className="animation-icon">🎤</div>
                   <div className="animation-gif">
                     <img src={imagelisting} alt="listening" />
                   </div>
                   <span>User Input</span>
                 </div>
-                <div className={`animation-item ${isAiSpeaking ? 'active' : ''}`}>
+                <div className={`animation-item ${isAiSpeaking ? "active" : ""}`}>
                   <div className="animation-icon">🔊</div>
                   <div className="animation-gif">
                     <img src={imagereply} alt="speaking" />

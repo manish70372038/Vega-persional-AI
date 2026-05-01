@@ -1,3 +1,4 @@
+// gemini.js - Complete working version
 const Gemniapi = async (command, userName, aiName) => {
   try {
     const apiUrl = "https://api.groq.com/openai/v1/chat/completions";
@@ -18,9 +19,9 @@ OUTPUT: Return ONLY this JSON, no extra text, no markdown:
 
 ACTIONS + TRIGGERS + URL:
 
-youtube_play → play/chala do/bajao/laga do + songname → url="https://www.youtube.com/results?search_query=SONGNAME+official+audio" | En: "Playing SONG for you!" | Hi: "SONG chala raha hoon!"
-youtube_search → search on youtube/youtube pe dhundh → url="https://www.youtube.com/results?search_query=QUERY" | En: "Searching QUERY on YouTube!" | Hi: "YouTube pe QUERY search kar raha hoon!"
-google_search → google/search/dhundh do → url="https://www.google.com/search?q=QUERY" | En: "Googling QUERY!" | Hi: "QUERY Google pe dhundh raha hoon!"
+youtube_play → play/chala do/bajao/laga do + songname → url="https://www.youtube.com/results?search_query=SONGNAME+official+audio" | reply En: "Playing SONG for you!" | reply Hi: "SONG chala raha hoon!"
+youtube_search → search on youtube/youtube pe dhundh → url="https://www.youtube.com/results?search_query=QUERY" | reply En: "Searching QUERY on YouTube!" | reply Hi: "YouTube pe QUERY search kar raha hoon!"
+google_search → google/search/dhundh do → url="https://www.google.com/search?q=QUERY" | reply En: "Googling QUERY!" | reply Hi: "QUERY Google pe dhundh raha hoon!"
 open_app → open/kholo/chalao/launch → fill data.app+data.deeplink+data.url
   instagram→deeplink:instagram://app url:https://www.instagram.com
   facebook→deeplink:fb://feed url:https://www.facebook.com
@@ -34,16 +35,16 @@ open_app → open/kholo/chalao/launch → fill data.app+data.deeplink+data.url
   gmail→deeplink:googlegmail:// url:https://mail.google.com
   linkedin→deeplink:linkedin://feed url:https://www.linkedin.com
   chrome→deeplink:googlechrome:// url:https://www.google.com
-navigate → rasta/directions/navigate → url="https://www.google.com/maps/search/PLACE" data.place=PLACE
-get_time → time/kitna baja → data.time=currenttime | En:"It's TIME ${userName}." | Hi:"Abhi TIME baj rahe hain ${userName}."
-get_date → date/aaj ki date → data.date=currentdate | En:"Today is DATE." | Hi:"Aaj DATE hai."
-get_day → day/kaun sa din → data.day=currentday | En:"Today is DAY." | Hi:"Aaj DAY hai."
-get_datetime → date and time/sab batao → fill time+date+day
-set_reminder → remind/alarm/yaad dilana → data.reminder_task+data.reminder_time | En:"Reminder set for TASK at TIME!" | Hi:"TIME baje TASK ka reminder set ho gaya!"
-calculate → calculate/kitna hoga/solve → data.expression+data.result | En:"EXPRESSION = RESULT" | Hi:"EXPRESSION ka jawab RESULT hai."
-get_weather → weather/mausam → url="https://wttr.in/CITY" data.place=CITY
-get_news → news/khabar → url="https://news.google.com/home?hl=en-IN"
-general → any question/bata/explain/kya hai → answer in 2 sentences detected language
+navigate → rasta/directions/navigate → url="https://www.google.com/maps/search/PLACE" data.place=PLACE | reply En: "Showing directions to PLACE" | reply Hi: "PLACE ke raaste dikha raha hoon"
+get_time → time/kitna baja → data.time=currenttime | reply En:"It's TIME ${userName}." | reply Hi:"Abhi TIME baj rahe hain ${userName}."
+get_date → date/aaj ki date → data.date=currentdate | reply En:"Today is DATE." | reply Hi:"Aaj DATE hai."
+get_day → day/kaun sa din → data.day=currentday | reply En:"Today is DAY." | reply Hi:"Aaj DAY hai."
+get_datetime → date and time/sab batao → fill time+date+day | reply En:"DATE, DAY and TIME" | reply Hi:"Aaj DATE hai, DAY, TIME baj raha hai"
+set_reminder → remind/alarm/yaad dilana → data.reminder_task+data.reminder_time | reply En:"Reminder set for TASK at TIME!" | reply Hi:"TIME baje TASK ka reminder set ho gaya!"
+calculate → calculate/kitna hoga/solve → data.expression+data.result | reply En:"EXPRESSION = RESULT" | reply Hi:"EXPRESSION ka jawab RESULT hai."
+get_weather → weather/mausam → url="https://wttr.in/CITY" data.place=CITY | reply En:"Checking weather for CITY" | reply Hi:"CITY ka mausam dekh raha hoon"
+get_news → news/khabar → url="https://news.google.com/home?hl=en-IN" | reply En:"Here are top news headlines" | reply Hi:"Yeh rahi top khabrein"
+general → any question/bata/explain/kya hai → answer in 2-3 sentences in detected language
 
 GREETING (hi/hello/hey/namaste/kya haal):
 En: {"reply":"Hey! I'm ${aiName}, your assistant. What can I do for you ${userName}?","action":"general","lang":"en-US","data":{}}
@@ -75,80 +76,88 @@ interview_end → "stop/end interview/band karo/khatam karo"
   Hi: "Interview khatam ${userName}! Acha kiya, practice karte raho!"
 
 ERROR:
-not understood → En:"Didn't catch that ${userName}, say again?" Hi:"Samaj nahi aaya ${userName}, dobara bolo?"  action:general
+not understood → En:"Didn't catch that ${userName}, say again?" Hi:"Samaj nahi aaya ${userName}, dobara bolo?" action:general
 song unclear → En:"Which song ${userName}?" Hi:"Konsa gaana ${userName}?" action:general
 cutoff → En:"Got cut off ${userName}, repeat?" Hi:"Adha reh gaya ${userName}, poora bolo?" action:general
 
-User says: "${command}"`
+IMPORTANT: Always fill "reply" field with proper response. NEVER leave reply empty.
+User says: "${command}"`;
 
-     const response = await fetch(apiUrl, {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.Grok_api}` // ← apiKey use karo
+        "Authorization": `Bearer ${process.env.REACT_APP_GROQ_API_KEY || localStorage.getItem("groq_api_key")}`,
       },
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
-        max_tokens: 250,
+        max_tokens: 300,
         temperature: 0.3,
         messages: [{ role: "user", content: prompt }],
-       
       })
     });
 
     const result = await response.json();
-    console.log("FULL RESULT:", result);
+    console.log("API Response:", result);
 
     if (result.choices && result.choices[0]?.message) {
       let text = result.choices[0].message.content;
-      console.log("RAW AI TEXT:", text);
+      console.log("Raw AI Output:", text);
 
-      // Clean karo pehle
       text = text.replace(/```json|```/g, "").trim();
 
       try {
         const jsonMatch = text.match(/{[\s\S]*}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
+          
+          // Ensure reply is never empty
+          if (!parsed.reply || parsed.reply.trim() === "") {
+            const isHindi = /[\u0900-\u097F]/.test(command);
+            parsed.reply = isHindi ? "Kya karoon aapke liye?" : "What can I do for you?";
+          }
+          
           return parsed;
         } else {
           throw new Error("No JSON found");
         }
       } catch (e) {
         console.error("JSON Parse Error:", e);
+        const isHindi = /[\u0900-\u097F]/.test(command);
         return {
-          reply: "Sorry, can you repeat that?",
+          reply: isHindi ? "Samajh nahi aaya, dobara boliye?" : "Didn't understand, please say again?",
           action: "general",
-          lang: "en-US",
+          lang: isHindi ? "hi-IN" : "en-US",
           data: {}
         };
       }
-
     } else {
       console.error("API Error:", result);
-      // Rate limit check karo
+      const isHindi = /[\u0900-\u097F]/.test(command);
+      
       if (result.error?.code === "rate_limit_exceeded") {
         return {
-          reply: "Your request limit expire try later ",
+          reply: isHindi ? "बहुत सारे request हो गए, थोड़ी देर बाद try करें" : "Too many requests, please try again later",
           action: "general",
-          lang: "hi-IN",
+          lang: isHindi ? "hi-IN" : "en-US",
           data: {}
         };
       }
+      
       return {
-        reply: "Response nahi aaya, dobara try karo.",
+        reply: isHindi ? "Kuch gadbad hui, phir se boliye" : "Something went wrong, please say again",
         action: "general",
-        lang: "en-US",
+        lang: isHindi ? "hi-IN" : "en-US",
         data: {}
       };
     }
-
   } catch (error) {
     console.error("Network Error:", error);
+    const isHindi = /[\u0900-\u097F]/.test(command);
     return {
-      reply: "Server se connect nahi ho pa raha.",
+      reply: isHindi ? "Internet connection check kariye" : "Please check your internet connection",
       action: "none",
-      lang: "en-US",
+      lang: isHindi ? "hi-IN" : "en-US",
       data: {}
     };
   }

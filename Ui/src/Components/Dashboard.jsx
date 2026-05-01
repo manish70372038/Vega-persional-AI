@@ -1,13 +1,10 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CssFiles/Mainpage.css";
 import useUser from "./userdata";
-import askAI from "./gemini";
+import Gemniapi from "./gemini";
 import imagelisting from "../assets/ai-input.gif";
 import imagereply from "../assets/ai-output.gif";
-import apibackend from "../apibackend";
-
 
 const isHindi = (text) => {
   const hindiPattern = /[\u0900-\u097F]/;
@@ -23,24 +20,17 @@ function Mainpage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const [assname, setassname] = useState("");
-  const [selectedAi, setselectedAi] = useState("");
+  const [selectedAi, setselectedAi] = useState(null);
   const [tempSelectedUrl, setTempSelectedUrl] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [voiceLang, setVoiceLang] = useState("en-US");
+  const [voiceLang, setVoiceLang] = useState("hi-IN");
   const recognitionRef = useRef(null);
   const shouldRunRef = useRef(false);
 
   const user = useUser();
 
-  // Voices preload karo — fast speech ke liye
-  useEffect(() => {
-    window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.getVoices();
-    };
-  }, []);
-
+  // Load saved AI on mount
   useEffect(() => {
     const savedAI = localStorage.getItem("selectedAI");
     if (savedAI) {
@@ -53,7 +43,7 @@ function Mainpage() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch(`${apibackend}/api/logout`, {
+    await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:4000"}/api/logout`, {
       method: "POST",
       credentials: "include",
     });
@@ -69,113 +59,98 @@ function Mainpage() {
       alert("Please select an image first!");
       return;
     }
+    if (!assname.trim()) {
+      alert("Please enter an AI name!");
+      return;
+    }
     const data = {
-      name: assname || "Default AI",
+      name: assname,
       url: tempSelectedUrl,
     };
     setselectedAi(data);
     localStorage.setItem("selectedAI", JSON.stringify(data));
   };
 
-  const speak = (text, lang = "en-US") => {
-    if (!text) return;
+  const speak = (text, lang = "hi-IN") => {
+    if (!text || text.trim() === "") return;
+    
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = 1.15;  // fast speech
+    utterance.rate = 0.95;
     utterance.pitch = 1;
 
-    // Best voice dhundho us language ke liye
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
     if (preferred) utterance.voice = preferred;
 
     utterance.onstart = () => setIsAiSpeaking(true);
     utterance.onend = () => setIsAiSpeaking(false);
+    utterance.onerror = () => setIsAiSpeaking(false);
+    
     window.speechSynthesis.speak(utterance);
   };
 
-  // Lang change hone pe recognition restart karo
+  // Voice recognition setup
   useEffect(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.log("Speech Recognition not supported");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
     recognition.lang = voiceLang;
-    if (isListening) {
-      shouldRunRef.current = false;
-      recognition.stop();
-      setTimeout(() => {
-        shouldRunRef.current = true;
-        try { recognition.start(); } catch (e) {}
-      }, 400);
-    }
-  }, [voiceLang]);
+    recognitionRef.current = recognition;
 
-  useEffect(() => {
-    try {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-
-      if (!SpeechRecognition) {
-        console.log("Speech Recognition supported nahi hai.");
-        return;
+    recognition.onresult = async (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      console.log("User said:", transcript);
+      
+      const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
+      const savedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
+      const aiName = savedAI?.name || "Assistant";
+      
+      const response = await Gemniapi(transcript, user?.name || "User", aiName);
+      console.log("AI Response:", response);
+      
+      if (response?.reply && response.reply.trim() !== "") {
+        const replyLang = response?.lang || detectedLang;
+        speak(response.reply, replyLang);
+      } else {
+        const fallback = detectedLang === "hi-IN" ? "Kya karoon aapke liye?" : "What can I do for you?";
+        speak(fallback, detectedLang);
       }
+      
+      if (response?.url) window.open(response.url, "_blank");
+      
+      if (response?.deeplink) {
+        window.location.href = response.deeplink;
+        setTimeout(() => {
+          if (response?.url) window.open(response.url, "_blank");
+        }, 2000);
+      }
+    };
 
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = voiceLang;
-      recognitionRef.current = recognition;
+    recognition.onerror = (event) => {
+      console.log("Speech error:", event.error);
+      if (event.error === "network" && shouldRunRef.current) {
+        setTimeout(() => {
+          try { recognition.start(); } catch (e) {}
+        }, 1000);
+      }
+    };
 
-      recognition.onresult = async (event) => {
-        const transcript =
-          event.results[event.results.length - 1][0].transcript.trim();
-        console.log("User bola:", transcript);
-
-        // Auto detect karo — Hindi hai ya English
-        const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
-        console.log("Detected lang:", detectedLang);
-
-        const response = await askAI(transcript);
-        console.log("AI Response:", response);
-
-        if (response?.reply) {
-          // reply ki lang se speak karo
-          const replyLang = response?.lang || detectedLang;
-          speak(response.reply, replyLang);
-        }
-
-        if (response?.url) window.open(response.url, "_blank");
-
-        if (response?.deeplink) {
-          window.location.href = response.deeplink;
-          setTimeout(() => {
-            if (response?.url) window.open(response.url, "_blank");
-          }, 2000);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.log("Speech error:", event.error);
-        // Network error pe restart karo
-        if (event.error === "network" && shouldRunRef.current) {
-          setTimeout(() => {
-            try { recognition.start(); } catch (e) {}
-          }, 1000);
-        }
-      };
-
-      recognition.onend = () => {
-        if (shouldRunRef.current) {
-          setTimeout(() => {
-            try { recognition.start(); } catch (e) {}
-          }, 300);
-        }
-      };
-    } catch (err) {
-      console.log("Speech Recognition Error:", err);
-    }
-  }, []);
+    recognition.onend = () => {
+      if (shouldRunRef.current) {
+        setTimeout(() => {
+          try { recognition.start(); } catch (e) {}
+        }, 300);
+      }
+    };
+  }, [voiceLang, user]);
 
   const toggleListening = () => {
     const recognition = recognitionRef.current;
@@ -198,175 +173,164 @@ function Mainpage() {
   };
 
   const toggleLang = () => {
-    setVoiceLang(prev => prev === "en-US" ? "hi-IN" : "en-US");
+    const newLang = voiceLang === "en-US" ? "hi-IN" : "en-US";
+    setVoiceLang(newLang);
+    
+    if (isListening) {
+      shouldRunRef.current = false;
+      recognitionRef.current?.stop();
+      setTimeout(() => {
+        shouldRunRef.current = true;
+        try {
+          recognitionRef.current.lang = newLang;
+          recognitionRef.current.start();
+        } catch (e) {}
+      }, 300);
+    }
   };
 
-  if (!user)
+  if (!user) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
         <p>Loading Dashboard...</p>
       </div>
     );
+  }
 
   return (
-    <div className="app-container">
-      {/* Top Navigation Bar */}
-      <nav className="top-nav">
-        <div className="nav-brand">
-          <span className="brand-icon"></span>
-          <span className="brand-name">Vega <span>AI</span></span>
+    <div className="dashboard-layout">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <div className="logo">
+            <span className="logo-icon">🎙️</span>
+            <h2>Voice<span>AI</span></h2>
+          </div>
+          <p className="welcome-text">Welcome, {user.name}</p>
         </div>
-        <div className="nav-menu">
-          <div className="user-menu" onClick={() => setDropdownOpen(!dropdownOpen)}>
-            <div className="user-avatar">
-              <span>{user.name?.charAt(0).toUpperCase()}</span>
+
+        <div className="config-section">
+          <h4>Configure Assistant</h4>
+          
+          <div className="input-group">
+            <label>AI Name</label>
+            <input
+              type="text"
+              placeholder="e.g., Vega, Jarvis, Alexa"
+              value={assname}
+              onChange={(e) => setassname(e.target.value)}
+            />
+          </div>
+          
+          <div className="input-group">
+            <label>Select Avatar</label>
+            <div className="avatar-grid">
+              {[
+                "https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg",
+                "https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg",
+                "https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg",
+                "https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg"
+              ].map((url, idx) => (
+                <div
+                  key={idx}
+                  className={`avatar-option ${tempSelectedUrl === url ? "selected" : ""}`}
+                  onClick={() => handleImageClick(url)}
+                >
+                  <img src={url} alt={`Avatar ${idx + 1}`} />
+                </div>
+              ))}
             </div>
-            <span className="user-name">{user.name}</span>
+          </div>
+          
+          <button className="create-btn" onClick={handleCreateAI}>
+            Create Assistant
+          </button>
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="user-info" onClick={() => setDropdownOpen(!dropdownOpen)}>
+            <div className="user-avatar">
+              {user.name?.charAt(0).toUpperCase()}
+            </div>
+            <div className="user-details">
+              <span className="user-name">{user.name}</span>
+              <span className="user-email">{user.email || `${user.name}@example.com`}</span>
+            </div>
           </div>
           {dropdownOpen && (
             <div className="dropdown-menu">
-              <button onClick={() => navigate("/profile")} className="dropdown-item">
-                <span>👤</span>
-                <span>Profile</span>
-              </button>
-              <button onClick={handleLogout} className="dropdown-item logout">
-                <span>🚪</span>
-                <span>Logout</span>
-              </button>
+              <button onClick={() => navigate("/profile")}>👤 Profile</button>
+              <button onClick={handleLogout} className="logout-btn">🚪 Logout</button>
             </div>
           )}
         </div>
-      </nav>
+      </div>
 
-      <div className="main-layout">
-        {/* Side Panel */}
-        <aside className="config-panel">
-          <div className="panel-header">
-            <h3>AI Assistant</h3>
-            <p>Configure your companion</p>
+      {/* Main Content */}
+      <div className="main-content">
+        {selectedAi ? (
+          <>
+            {/* Top Bar */}
+            <div className="top-bar">
+              <div className="greeting">
+                <h1>Hello, {user.name} 👋</h1>
+                <p>Your assistant {selectedAi.name} is ready</p>
+              </div>
+              <div className="controls">
+                <button className="lang-btn" onClick={toggleLang}>
+                  {voiceLang === "hi-IN" ? "🇮🇳 Hindi" : "🇺🇸 English"}
+                </button>
+                <button 
+                  className={`voice-btn ${isListening ? "active" : ""}`}
+                  onClick={toggleListening}
+                >
+                  <span>{isListening ? "🔴" : "🎤"}</span>
+                  <span>{isListening ? "Listening..." : "Start Voice"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* AI Avatar Display */}
+            <div className="ai-display">
+              <div className={`ai-avatar-container ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
+                <img src={selectedAi.url} alt={selectedAi.name} className="ai-avatar-image" />
+                {(isAiSpeaking || isListening) && (
+                  <div className="status-overlay">
+                    {isAiSpeaking ? "🔊 Speaking..." : "🎧 Listening..."}
+                  </div>
+                )}
+              </div>
+              <div className="ai-info">
+                <h2>{selectedAi.name}</h2>
+                <div className="status-badge">
+                  <span className={`status-dot ${isAiSpeaking ? "speaking" : isListening ? "listening" : "idle"}`}></span>
+                  <span>{isAiSpeaking ? "Speaking" : isListening ? "Listening" : "Idle"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Animation Section */}
+            <div className="animations">
+              <div className={`animation-card ${isListening && !isAiSpeaking ? "active" : ""}`}>
+                <div className="animation-icon">🎤</div>
+                <img src={imagelisting} alt="Listening" className="animation-gif" />
+                <p>Voice Input</p>
+              </div>
+              <div className={`animation-card ${isAiSpeaking ? "active" : ""}`}>
+                <div className="animation-icon">🔊</div>
+                <img src={imagereply} alt="Speaking" className="animation-gif" />
+                <p>AI Response</p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon">🤖</div>
+            <h3>No Assistant Configured</h3>
+            <p>Create your AI assistant from the sidebar</p>
           </div>
-
-          <div className="config-form">
-            <div className="form-group">
-              <label>AI Name</label>
-              <input
-                type="text"
-                placeholder="Enter name..."
-                value={assname}
-                onChange={(e) => setassname(e.target.value)}
-                className="name-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Select Avatar</label>
-              <div className="avatar-grid">
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg")}
-                >
-                  <img src="https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" alt="Avatar 1" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg")}
-                >
-                  <img src="https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" alt="Avatar 2" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg")}
-                >
-                  <img src="https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" alt="Avatar 3" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg")}
-                >
-                  <img src="https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg" alt="Avatar 4" />
-                </div>
-              </div>
-            </div>
-
-            <button onClick={handleCreateAI} className="create-btn">
-              Create Assistant
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="content-area">
-          {selectedAi ? (
-            <>
-              <div className="voice-control">
-                <div className="welcome-text">
-                  <h2>Hello, {user.name}</h2>
-                  <p>Your assistant is ready</p>
-                </div>
-
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  {/* Language Toggle */}
-                  <button onClick={toggleLang} className="voice-btn"
-                    style={{ background: voiceLang === "hi-IN" ? "#f97316" : "#6366f1" }}>
-                    <span>{voiceLang === "hi-IN" ? "🇮🇳" : "🇺🇸"}</span>
-                    <span>{voiceLang === "hi-IN" ? "Hindi" : "English"}</span>
-                  </button>
-
-                  {/* Voice Button */}
-                  <button
-                    onClick={toggleListening}
-                    className={`voice-btn ${isListening ? "active" : ""}`}
-                  >
-                    <span>{isListening ? "🔴" : "🎤"}</span>
-                    <span>{isListening ? "Listening..." : "Start Voice"}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="ai-showcase">
-                <div className={`ai-avatar ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
-                  <img src={selectedAi.url} alt={selectedAi.name} />
-                  {(isAiSpeaking || isListening) && (
-                    <div className="status-indicator">
-                      {isAiSpeaking ? "🔊 Speaking..." : "🎧 Listening..."}
-                    </div>
-                  )}
-                </div>
-                <div className="ai-details">
-                  <h3>{selectedAi.name}</h3>
-                  <div className="status-badge">
-                    <span className={`status-icon ${isAiSpeaking ? "speaking" : isListening ? "listening" : "idle"}`}></span>
-                    <span>{isAiSpeaking ? "Speaking" : isListening ? "Listening" : "Idle"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="animation-section">
-                <div className={`animation-item ${isListening && !isAiSpeaking ? "active" : ""}`}>
-                  <div className="animation-icon">🎤</div>
-                  <div className="animation-gif">
-                    <img src={imagelisting} alt="listening" />
-                  </div>
-                  <span>User Input</span>
-                </div>
-                <div className={`animation-item ${isAiSpeaking ? "active" : ""}`}>
-                  <div className="animation-icon">🔊</div>
-                  <div className="animation-gif">
-                    <img src={imagereply} alt="speaking" />
-                  </div>
-                  <span>AI Response</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="empty-assistant">
-              <div className="empty-icon">🤖</div>
-              <h3>No Assistant Configured</h3>
-              <p>Create your AI assistant from the side panel</p>
-            </div>
-          )}
-        </main>
+        )}
       </div>
     </div>
   );

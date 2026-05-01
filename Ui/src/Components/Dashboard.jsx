@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CssFiles/Mainpage.css";
@@ -6,6 +7,7 @@ import askAI from "./gemini";
 import imagelisting from "../assets/ai-input.gif";
 import imagereply from "../assets/ai-output.gif";
 import apibackend from "../apibackend";
+
 
 const isHindi = (text) => {
   const hindiPattern = /[\u0900-\u097F]/;
@@ -28,10 +30,10 @@ function Mainpage() {
   const [voiceLang, setVoiceLang] = useState("en-US");
   const recognitionRef = useRef(null);
   const shouldRunRef = useRef(false);
-  const isProcessingRef = useRef(false); // ← duplicate response rokne ke liye
 
   const user = useUser();
 
+  // Voices preload karo — fast speech ke liye
   useEffect(() => {
     window.speechSynthesis.getVoices();
     window.speechSynthesis.onvoiceschanged = () => {
@@ -78,18 +80,23 @@ function Mainpage() {
   const speak = (text, lang = "en-US") => {
     if (!text) return;
     window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = 1.15;
+    utterance.rate = 1.15;  // fast speech
     utterance.pitch = 1;
+
+    // Best voice dhundho us language ke liye
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
     if (preferred) utterance.voice = preferred;
+
     utterance.onstart = () => setIsAiSpeaking(true);
     utterance.onend = () => setIsAiSpeaking(false);
     window.speechSynthesis.speak(utterance);
   };
 
+  // Lang change hone pe recognition restart karo
   useEffect(() => {
     const recognition = recognitionRef.current;
     if (!recognition) return;
@@ -121,61 +128,36 @@ function Mainpage() {
       recognitionRef.current = recognition;
 
       recognition.onresult = async (event) => {
-        const lastResult = event.results[event.results.length - 1];
-
-        // Fix 1 — sirf final result lo, duplicate rokne ke liye
-        if (!lastResult.isFinal) return;
-
-        // Fix 2 — agar already processing ho toh skip karo
-        if (isProcessingRef.current) return;
-        isProcessingRef.current = true;
-
-        const transcript = lastResult[0].transcript.trim();
+        const transcript =
+          event.results[event.results.length - 1][0].transcript.trim();
         console.log("User bola:", transcript);
 
+        // Auto detect karo — Hindi hai ya English
         const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
         console.log("Detected lang:", detectedLang);
 
-        try {
-          const response = await askAI(transcript);
-          console.log("AI Response:", response);
+        const response = await askAI(transcript);
+        console.log("AI Response:", response);
 
-          // Reply speak karo
-          if (response?.reply) {
-            const replyLang = response?.lang || detectedLang;
-            speak(response.reply, replyLang);
-          }
+        if (response?.reply) {
+          // reply ki lang se speak karo
+          const replyLang = response?.lang || detectedLang;
+          speak(response.reply, replyLang);
+        }
 
-          // URL nikalo — dono jagah se check karo
-          const finalUrl = response?.url || response?.data?.url;
-          const finalDeeplink = response?.deeplink || response?.data?.deeplink;
+        if (response?.url) window.open(response.url, "_blank");
 
-          // Fix 3 — open_app alag handle karo
-          if (response?.action === "open_app") {
-            if (finalDeeplink) {
-              window.location.href = finalDeeplink;
-              setTimeout(() => {
-                if (finalUrl) window.open(finalUrl, "_blank");
-              }, 2000);
-            } else if (finalUrl) {
-              window.open(finalUrl, "_blank");
-            }
-          } else if (finalUrl) {
-            // YouTube, Google, Weather, News sab
-            window.open(finalUrl, "_blank");
-          }
-
-        } catch (err) {
-          console.log("AI Error:", err);
-        } finally {
-          // Processing complete — next request ke liye unlock karo
-          isProcessingRef.current = false;
+        if (response?.deeplink) {
+          window.location.href = response.deeplink;
+          setTimeout(() => {
+            if (response?.url) window.open(response.url, "_blank");
+          }, 2000);
         }
       };
 
       recognition.onerror = (event) => {
         console.log("Speech error:", event.error);
-        isProcessingRef.current = false;
+        // Network error pe restart karo
         if (event.error === "network" && shouldRunRef.current) {
           setTimeout(() => {
             try { recognition.start(); } catch (e) {}
@@ -229,6 +211,7 @@ function Mainpage() {
 
   return (
     <div className="app-container">
+      {/* Top Navigation Bar */}
       <nav className="top-nav">
         <div className="nav-brand">
           <span className="brand-icon"></span>
@@ -257,6 +240,7 @@ function Mainpage() {
       </nav>
 
       <div className="main-layout">
+        {/* Side Panel */}
         <aside className="config-panel">
           <div className="panel-header">
             <h3>AI Assistant</h3>
@@ -311,6 +295,7 @@ function Mainpage() {
           </div>
         </aside>
 
+        {/* Main Content */}
         <main className="content-area">
           {selectedAi ? (
             <>
@@ -321,12 +306,14 @@ function Mainpage() {
                 </div>
 
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  {/* Language Toggle */}
                   <button onClick={toggleLang} className="voice-btn"
                     style={{ background: voiceLang === "hi-IN" ? "#f97316" : "#6366f1" }}>
                     <span>{voiceLang === "hi-IN" ? "🇮🇳" : "🇺🇸"}</span>
                     <span>{voiceLang === "hi-IN" ? "Hindi" : "English"}</span>
                   </button>
 
+                  {/* Voice Button */}
                   <button
                     onClick={toggleListening}
                     className={`voice-btn ${isListening ? "active" : ""}`}

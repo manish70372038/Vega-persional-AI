@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CssFiles/Mainpage.css";
@@ -7,7 +6,6 @@ import askAI from "./gemini";
 import imagelisting from "../assets/ai-input.gif";
 import imagereply from "../assets/ai-output.gif";
 import apibackend from "../apibackend";
-
 
 const isHindi = (text) => {
   const hindiPattern = /[\u0900-\u097F]/;
@@ -23,22 +21,18 @@ function Mainpage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const [assname, setassname] = useState("");
-  const [selectedAi, setselectedAi] = useState("");
+  const [selectedAi, setselectedAi] = useState(null);
   const [tempSelectedUrl, setTempSelectedUrl] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [voiceLang, setVoiceLang] = useState("en-US");
+  const [voiceLang, setVoiceLang] = useState("hi-IN");
   const recognitionRef = useRef(null);
   const shouldRunRef = useRef(false);
 
   const user = useUser();
 
-  // Voices preload karo — fast speech ke liye
   useEffect(() => {
     window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.getVoices();
-    };
   }, []);
 
   useEffect(() => {
@@ -77,16 +71,15 @@ function Mainpage() {
     localStorage.setItem("selectedAI", JSON.stringify(data));
   };
 
-  const speak = (text, lang = "en-US") => {
+  const speak = (text, lang = "hi-IN") => {
     if (!text) return;
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = 1.15;  // fast speech
+    utterance.rate = 1;
     utterance.pitch = 1;
 
-    // Best voice dhundho us language ke liye
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
     if (preferred) utterance.voice = preferred;
@@ -96,7 +89,6 @@ function Mainpage() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Lang change hone pe recognition restart karo
   useEffect(() => {
     const recognition = recognitionRef.current;
     if (!recognition) return;
@@ -113,9 +105,7 @@ function Mainpage() {
 
   useEffect(() => {
     try {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         console.log("Speech Recognition supported nahi hai.");
         return;
@@ -128,25 +118,22 @@ function Mainpage() {
       recognitionRef.current = recognition;
 
       recognition.onresult = async (event) => {
-        const transcript =
-          event.results[event.results.length - 1][0].transcript.trim();
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
         console.log("User bola:", transcript);
 
-        // Auto detect karo — Hindi hai ya English
         const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
-        console.log("Detected lang:", detectedLang);
+        const savedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
+        const aiName = savedAI?.name || "Assistant";
 
-        const response = await askAI(transcript);
+        const response = await askAI(transcript, user?.name, aiName);
         console.log("AI Response:", response);
 
         if (response?.reply) {
-          // reply ki lang se speak karo
           const replyLang = response?.lang || detectedLang;
           speak(response.reply, replyLang);
         }
 
         if (response?.url) window.open(response.url, "_blank");
-
         if (response?.deeplink) {
           window.location.href = response.deeplink;
           setTimeout(() => {
@@ -157,7 +144,6 @@ function Mainpage() {
 
       recognition.onerror = (event) => {
         console.log("Speech error:", event.error);
-        // Network error pe restart karo
         if (event.error === "network" && shouldRunRef.current) {
           setTimeout(() => {
             try { recognition.start(); } catch (e) {}
@@ -175,7 +161,7 @@ function Mainpage() {
     } catch (err) {
       console.log("Speech Recognition Error:", err);
     }
-  }, []);
+  }, [voiceLang, user]);
 
   const toggleListening = () => {
     const recognition = recognitionRef.current;
@@ -211,159 +197,148 @@ function Mainpage() {
 
   return (
     <div className="app-container">
-      {/* Top Navigation Bar */}
+      {/* Top Navigation */}
       <nav className="top-nav">
         <div className="nav-brand">
-          <span className="brand-icon"></span>
-          <span className="brand-name">Vega <span>AI</span></span>
+          <div className="brand-logo">✨</div>
+          <div className="brand-name">Neo<span>Voice</span></div>
         </div>
-        <div className="nav-menu">
-          <div className="user-menu" onClick={() => setDropdownOpen(!dropdownOpen)}>
+        <div className="nav-actions">
+          <div className="lang-switch" onClick={toggleLang}>
+            <span>{voiceLang === "hi-IN" ? "🇮🇳" : "🇺🇸"}</span>
+            <span>{voiceLang === "hi-IN" ? "हिंदी" : "EN"}</span>
+          </div>
+          <div className="user-dropdown" onClick={() => setDropdownOpen(!dropdownOpen)}>
             <div className="user-avatar">
-              <span>{user.name?.charAt(0).toUpperCase()}</span>
+              {user.name?.charAt(0).toUpperCase()}
             </div>
             <span className="user-name">{user.name}</span>
           </div>
           {dropdownOpen && (
             <div className="dropdown-menu">
               <button onClick={() => navigate("/profile")} className="dropdown-item">
-                <span>👤</span>
-                <span>Profile</span>
+                👤 Profile
               </button>
               <button onClick={handleLogout} className="dropdown-item logout">
-                <span>🚪</span>
-                <span>Logout</span>
+                🚪 Logout
               </button>
             </div>
           )}
         </div>
       </nav>
 
-      <div className="main-layout">
-        {/* Side Panel */}
-        <aside className="config-panel">
-          <div className="panel-header">
-            <h3>AI Assistant</h3>
-            <p>Configure your companion</p>
+      <div className="main-container">
+        {/* Left Sidebar - Config Panel */}
+        <aside className="config-sidebar">
+          <div className="config-header">
+            <h3>Create Your AI</h3>
+            <p>Personalize your assistant</p>
           </div>
 
-          <div className="config-form">
-            <div className="form-group">
-              <label>AI Name</label>
+          <div className="config-body">
+            <div className="input-field">
+              <label>Assistant Name</label>
               <input
                 type="text"
-                placeholder="Enter name..."
+                placeholder="e.g., Vega, Jarvis"
                 value={assname}
                 onChange={(e) => setassname(e.target.value)}
-                className="name-input"
               />
             </div>
 
-            <div className="form-group">
-              <label>Select Avatar</label>
-              <div className="avatar-grid">
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg")}
-                >
-                  <img src="https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg" alt="Avatar 1" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg")}
-                >
-                  <img src="https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg" alt="Avatar 2" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg")}
-                >
-                  <img src="https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg" alt="Avatar 3" />
-                </div>
-                <div
-                  className={`avatar-card ${tempSelectedUrl === "https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg" ? "selected" : ""}`}
-                  onClick={() => handleImageClick("https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg")}
-                >
-                  <img src="https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg" alt="Avatar 4" />
-                </div>
+            <div className="input-field">
+              <label>Choose Avatar</label>
+              <div className="avatar-selector">
+                {[
+                  "https://t3.ftcdn.net/jpg/09/40/72/30/360_F_940723032_ymlwbOQkZOpEmqvxOCwEl8l0Ggx6xUdQ.jpg",
+                  "https://imgcdn.stablediffusionweb.com/2024/12/1/0f930cb6-d399-4735-9b30-e35d024e3efd.jpg",
+                  "https://img.freepik.com/premium-photo/face-that-has-word-ai-it_872754-2069.jpg",
+                  "https://img.freepik.com/premium-photo/face-female-robot-artificial-intelligence-concept_1106493-21089.jpg"
+                ].map((url, idx) => (
+                  <div
+                    key={idx}
+                    className={`avatar-opt ${tempSelectedUrl === url ? "active" : ""}`}
+                    onClick={() => handleImageClick(url)}
+                  >
+                    <img src={url} alt={`avatar-${idx}`} />
+                  </div>
+                ))}
               </div>
             </div>
 
-            <button onClick={handleCreateAI} className="create-btn">
-              Create Assistant
+            <button className="create-assistant-btn" onClick={handleCreateAI}>
+              Launch Assistant
             </button>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="content-area">
+        {/* Main Content Area */}
+        <main className="main-content-area">
           {selectedAi ? (
             <>
-              <div className="voice-control">
-                <div className="welcome-text">
-                  <h2>Hello, {user.name}</h2>
-                  <p>Your assistant is ready</p>
+              {/* Welcome Header */}
+              <div className="welcome-section">
+                <div className="greeting-box">
+                  <h1>Hey {user.name} 👋</h1>
+                  <p>Your assistant is online & ready</p>
                 </div>
-
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                  {/* Language Toggle */}
-                  <button onClick={toggleLang} className="voice-btn"
-                    style={{ background: voiceLang === "hi-IN" ? "#f97316" : "#6366f1" }}>
-                    <span>{voiceLang === "hi-IN" ? "🇮🇳" : "🇺🇸"}</span>
-                    <span>{voiceLang === "hi-IN" ? "Hindi" : "English"}</span>
-                  </button>
-
-                  {/* Voice Button */}
-                  <button
-                    onClick={toggleListening}
-                    className={`voice-btn ${isListening ? "active" : ""}`}
-                  >
-                    <span>{isListening ? "🔴" : "🎤"}</span>
-                    <span>{isListening ? "Listening..." : "Start Voice"}</span>
-                  </button>
-                </div>
+                <button
+                  onClick={toggleListening}
+                  className={`mic-button ${isListening ? "active" : ""}`}
+                >
+                  <span>{isListening ? "🔴" : "🎤"}</span>
+                  <span>{isListening ? "Listening..." : "Start Voice"}</span>
+                </button>
               </div>
 
-              <div className="ai-showcase">
-                <div className={`ai-avatar ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
-                  <img src={selectedAi.url} alt={selectedAi.name} />
-                  {(isAiSpeaking || isListening) && (
-                    <div className="status-indicator">
-                      {isAiSpeaking ? "🔊 Speaking..." : "🎧 Listening..."}
-                    </div>
-                  )}
+              {/* AI Character Display */}
+              <div className="character-display">
+                <div className={`character-card ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
+                  <div className="character-glow"></div>
+                  <img src={selectedAi.url} alt={selectedAi.name} className="character-img" />
+                  <div className="character-status">
+                    {isAiSpeaking ? "🔊 Speaking..." : isListening ? "🎧 Listening..." : "💤 Idle"}
+                  </div>
                 </div>
-                <div className="ai-details">
-                  <h3>{selectedAi.name}</h3>
-                  <div className="status-badge">
-                    <span className={`status-icon ${isAiSpeaking ? "speaking" : isListening ? "listening" : "idle"}`}></span>
-                    <span>{isAiSpeaking ? "Speaking" : isListening ? "Listening" : "Idle"}</span>
+                <div className="character-info">
+                  <h2>{selectedAi.name}</h2>
+                  <div className="status-chip">
+                    <span className={`status-led ${isAiSpeaking ? "speak" : isListening ? "listen" : "idle"}`}></span>
+                    <span>{isAiSpeaking ? "Active" : isListening ? "Receiving" : "Standby"}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="animation-section">
-                <div className={`animation-item ${isListening && !isAiSpeaking ? "active" : ""}`}>
-                  <div className="animation-icon">🎤</div>
-                  <div className="animation-gif">
-                    <img src={imagelisting} alt="listening" />
+              {/* Voice Activity Panel */}
+              <div className="activity-panel">
+                <div className={`activity-card ${isListening && !isAiSpeaking ? "active" : ""}`}>
+                  <div className="activity-icon">🎙️</div>
+                  <div className="activity-gif">
+                    <img src={imagelisting} alt="input" />
                   </div>
-                  <span>User Input</span>
+                  <div className="activity-label">Voice Input</div>
+                  <div className="activity-wave">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
                 </div>
-                <div className={`animation-item ${isAiSpeaking ? "active" : ""}`}>
-                  <div className="animation-icon">🔊</div>
-                  <div className="animation-gif">
-                    <img src={imagereply} alt="speaking" />
+                <div className={`activity-card ${isAiSpeaking ? "active" : ""}`}>
+                  <div className="activity-icon">🔊</div>
+                  <div className="activity-gif">
+                    <img src={imagereply} alt="output" />
                   </div>
-                  <span>AI Response</span>
+                  <div className="activity-label">AI Response</div>
+                  <div className="activity-wave">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
                 </div>
               </div>
             </>
           ) : (
-            <div className="empty-assistant">
-              <div className="empty-icon">🤖</div>
+            <div className="empty-center">
+              <div className="empty-illustration">🤖</div>
               <h3>No Assistant Configured</h3>
-              <p>Create your AI assistant from the side panel</p>
+              <p>Set up your AI companion from the left panel</p>
+              <div className="empty-hint">✨ Select avatar & give a name ✨</div>
             </div>
           )}
         </main>

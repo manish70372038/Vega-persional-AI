@@ -28,11 +28,15 @@ function Mainpage() {
   const [voiceLang, setVoiceLang] = useState("hi-IN");
   const recognitionRef = useRef(null);
   const shouldRunRef = useRef(false);
+  const isProcessingRef = useRef(false); // ← duplicate rokne ke liye
 
   const user = useUser();
 
   useEffect(() => {
     window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
   }, []);
 
   useEffect(() => {
@@ -74,16 +78,13 @@ function Mainpage() {
   const speak = (text, lang = "hi-IN") => {
     if (!text) return;
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
     utterance.rate = 1;
     utterance.pitch = 1;
-
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(v => v.lang.startsWith(lang.split("-")[0]));
     if (preferred) utterance.voice = preferred;
-
     utterance.onstart = () => setIsAiSpeaking(true);
     utterance.onend = () => setIsAiSpeaking(false);
     window.speechSynthesis.speak(utterance);
@@ -104,6 +105,8 @@ function Mainpage() {
   }, [voiceLang]);
 
   useEffect(() => {
+    if (!user) return; // user load hone tak wait karo
+
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -118,32 +121,62 @@ function Mainpage() {
       recognitionRef.current = recognition;
 
       recognition.onresult = async (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        const lastResult = event.results[event.results.length - 1];
+
+        // Fix 1 — sirf final result process karo
+        if (!lastResult.isFinal) return;
+
+        // Fix 2 — agar already processing ho toh skip karo
+        if (isProcessingRef.current) return;
+        isProcessingRef.current = true;
+
+        const transcript = lastResult[0].transcript.trim();
         console.log("User bola:", transcript);
 
         const detectedLang = isHindi(transcript) ? "hi-IN" : "en-US";
         const savedAI = JSON.parse(localStorage.getItem("selectedAI")) || {};
         const aiName = savedAI?.name || "Assistant";
 
-        const response = await askAI(transcript, user?.name, aiName);
-        console.log("AI Response:", response);
+        try {
+          const response = await askAI(transcript, user?.name, aiName);
+          console.log("AI Response:", response);
 
-        if (response?.reply) {
-          const replyLang = response?.lang || detectedLang;
-          speak(response.reply, replyLang);
-        }
+          // Reply speak karo
+          if (response?.reply) {
+            const replyLang = response?.lang || detectedLang;
+            speak(response.reply, replyLang);
+          }
 
-        if (response?.url) window.open(response.url, "_blank");
-        if (response?.deeplink) {
-          window.location.href = response.deeplink;
-          setTimeout(() => {
-            if (response?.url) window.open(response.url, "_blank");
-          }, 2000);
+          // Fix 3 — URL dono jagah se check karo
+          const finalUrl = response?.url || response?.data?.url;
+          const finalDeeplink = response?.deeplink || response?.data?.deeplink;
+
+          // Fix 4 — open_app alag handle karo
+          if (response?.action === "open_app") {
+            if (finalDeeplink) {
+              window.location.href = finalDeeplink;
+              setTimeout(() => {
+                if (finalUrl) window.open(finalUrl, "_blank");
+              }, 2000);
+            } else if (finalUrl) {
+              window.open(finalUrl, "_blank");
+            }
+          } else if (finalUrl) {
+            // YouTube, Google, Weather, News etc
+            window.open(finalUrl, "_blank");
+          }
+
+        } catch (err) {
+          console.log("AI Error:", err);
+        } finally {
+          // Processing unlock karo
+          isProcessingRef.current = false;
         }
       };
 
       recognition.onerror = (event) => {
         console.log("Speech error:", event.error);
+        isProcessingRef.current = false;
         if (event.error === "network" && shouldRunRef.current) {
           setTimeout(() => {
             try { recognition.start(); } catch (e) {}
@@ -158,10 +191,11 @@ function Mainpage() {
           }, 300);
         }
       };
+
     } catch (err) {
       console.log("Speech Recognition Error:", err);
     }
-  }, [voiceLang, user]);
+  }, [user]); // ← voiceLang dependency hatai — infinite loop rokne ke liye
 
   const toggleListening = () => {
     const recognition = recognitionRef.current;
@@ -228,7 +262,7 @@ function Mainpage() {
       </nav>
 
       <div className="main-container">
-        {/* Left Sidebar - Config Panel */}
+        {/* Left Sidebar */}
         <aside className="config-sidebar">
           <div className="config-header">
             <h3>Create Your AI</h3>
@@ -272,11 +306,10 @@ function Mainpage() {
           </div>
         </aside>
 
-        {/* Main Content Area */}
+        {/* Main Content */}
         <main className="main-content-area">
           {selectedAi ? (
             <>
-              {/* Welcome Header */}
               <div className="welcome-section">
                 <div className="greeting-box">
                   <h1>Hey {user.name} 👋</h1>
@@ -291,7 +324,6 @@ function Mainpage() {
                 </button>
               </div>
 
-              {/* AI Character Display */}
               <div className="character-display">
                 <div className={`character-card ${isAiSpeaking ? "speaking" : isListening ? "listening" : ""}`}>
                   <div className="character-glow"></div>
@@ -309,7 +341,6 @@ function Mainpage() {
                 </div>
               </div>
 
-              {/* Voice Activity Panel */}
               <div className="activity-panel">
                 <div className={`activity-card ${isListening && !isAiSpeaking ? "active" : ""}`}>
                   <div className="activity-icon">🎙️</div>
